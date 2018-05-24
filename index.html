@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Poke App</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+	  #intro{
+		text-align: center;
+		background-color: #ccc;
+	  }
+	  #username{
+		margin-top: 20px;
+		width: 300px;
+		font-size: 30px;
+	  }
+	  #no-one{
+		display: none;
+		text-align: center;
+	  }
+	  #guys{
+		text-align: center;
+	  }
+	  #guys button{
+		background-color: green;
+		font-size: 30px;
+		color: white;
+		cursor: pointer;
+		display: block;
+		margin: auto;
+	  }
+	  #pokes{
+		margin-top: 40px;
+		color: orange;
+	  }
+	  #greeting{
+		color: green;
+		text-align: center;
+		margin-bottom: 30px;
+	  }
+    </style>
+  </head>
+  <body>
+	<div id="intro">
+		<h1>Please Enter Some User Name</h1>
+		<input id="username">
+	</div>
+	<h1 id="greeting"></h1>
+	<h1 id="no-one">No One is Here<h1>
+	<div id="guys"></div>
+	<div id="pokes"></div>
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+    <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+	var $intro = $('#intro');
+	var $username = $('#username');
+	var username;
+	var $guysContainer = $('#guys');
+	var $pokesContainer = $('#pokes');
+	var $noOne = $('#no-one');
+	var $greeting = $('#greeting');
+	var socket;
+	var guysCount = 0;
+	$(function (){
+		$username.keyup(function (e){
+			if(e.keyCode == 13){
+				if(!$username.val()){
+					alert("You Must Enter a User Name");
+					return;
+				}
+				$.post('/isUnique',{name: $username.val()},function(data){
+					switch(data.status){
+						case 'taken':
+							alert("This username is taken");
+							break;
+						case 'okay':
+							username = $username.val();
+							$intro.remove();
+							showGuys(data.guys);
+							connectToPoke();
+							break;
+						default:
+							return;
+					}
+				});
+			}
+		});
+	});
+	function connectToPoke(){
+		socket = io({
+			query: {
+				username: username
+			}
+		});
+		$greeting.text('Hello ' + username);
+		socket.emit('ready',{username: username});
+		
+		socket.on('newGuy',function (username){
+			addGuy(username);
+		});
+		socket.on('guyLeft',function(username){
+			removeGuy(username);
+		});
+		socket.on('poked',function(msg){
+			$pokesContainer.append($('<h5>' + msg + '</h5>'));
+		});
+		
+		socket.on('disconnect',function (msg){
+			document.body.innerHTML = '<h1> You are discnnected</h1>';
+		});
+	}
+	function showGuys(guys){
+		if(guys.length == 0){
+			$noOne.show();
+			return;
+		}
+		guysCount = guys.length;
+		$noOne.hide();
+		guys.forEach(function(guy){
+			addGuy(guy);
+		});
+	}
+	function addGuy(username){
+		guysCount++;
+		var $guy = document.createElement('button');
+		$guy.innerText = "Poke "+ username;
+		$guy.id = username;
+		$($guy).click(function (e){
+			socket.emit('poke',this.id);
+		});
+		$guysContainer.append($guy);
+	}
+	function removeGuy(username){
+		guysCount--;
+		$('#' + username).remove();
+		if(guysCount === 0){
+			$noOne.show();
+		}
+	}
+    </script>
+  </body>
+</html>
